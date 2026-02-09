@@ -153,7 +153,10 @@ class AEAnalyzer:
             self.file_label.config(text=f"Loaded: {os.path.basename(filename)}")
             
             # Populate column dropdowns
-            columns = tuple(self.data.columns)
+            # Convert to tuple for proper tkinter Combobox display
+            # Using tuple() ensures columns appear as separate dropdown items
+            # rather than as a single comma-separated string
+            columns = tuple(str(col) for col in self.data.columns)
             self.time_combo['values'] = columns
             self.rpm_combo['values'] = columns
             self.tps_combo['values'] = columns
