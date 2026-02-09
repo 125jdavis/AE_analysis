@@ -2,6 +2,8 @@
 
 Tool for analyzing acceleration enrichment (AE) events in MegaSquirt log files.
 
+![AE Event Detection Demo](https://github.com/user-attachments/assets/d8a3afc5-5101-452e-80c6-b63437f930f7)
+
 ## Features
 
 - Load MegaLog (.mlg) or CSV files
