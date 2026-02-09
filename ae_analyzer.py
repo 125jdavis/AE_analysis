@@ -153,7 +153,7 @@ class AEAnalyzer:
             self.file_label.config(text=f"Loaded: {os.path.basename(filename)}")
             
             # Populate column dropdowns
-            columns = list(self.data.columns)
+            columns = tuple(self.data.columns)
             self.time_combo['values'] = columns
             self.rpm_combo['values'] = columns
             self.tps_combo['values'] = columns
