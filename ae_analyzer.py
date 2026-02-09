@@ -147,7 +147,7 @@ class AEAnalyzer:
             # Try reading with different separators
             try:
                 self.data = pd.read_csv(filename, sep=';')
-            except:
+            except (pd.errors.ParserError, pd.errors.EmptyDataError):
                 self.data = pd.read_csv(filename, sep=',')
             
             self.file_label.config(text=f"Loaded: {os.path.basename(filename)}")
@@ -184,7 +184,8 @@ class AEAnalyzer:
             )
             if result.returncode == 0 and os.path.exists(output_file):
                 return output_file
-        except:
+        except (subprocess.TimeoutExpired, FileNotFoundError, 
+                subprocess.CalledProcessError, OSError):
             pass
         return None
     
