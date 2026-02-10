@@ -138,16 +138,38 @@ class AEAnalyzer:
         try:
             # Check if it's an MLG file
             if filename.lower().endswith('.mlg'):
+                # Show status message
+                self.file_label.config(text="Converting MLG file...")
+                self.root.update()
+                
                 # Try to convert MLG to CSV using mlg-converter if available
                 csv_filename = self.convert_mlg_to_csv(filename)
                 if csv_filename:
                     filename = csv_filename
                 else:
-                    messagebox.showerror("Error", 
-                        "Cannot read .mlg files directly. Please:\n"
-                        "1. Install Node.js and mlg-converter: npm install -g mlg-converter\n"
-                        "2. Convert to CSV: npx mlg-converter --format=csv yourfile.mlg\n"
-                        "3. Load the resulting CSV file")
+                    # Check if npx is available
+                    import subprocess
+                    try:
+                        subprocess.run(['npx', '--version'], capture_output=True, timeout=5)
+                        error_msg = (
+                            "Failed to convert .mlg file to CSV.\n\n"
+                            "The mlg-converter tool encountered an error. "
+                            "Check the console output for details.\n\n"
+                            "You can manually convert using:\n"
+                            "npx mlg-converter --format=csv yourfile.mlg"
+                        )
+                    except (FileNotFoundError, subprocess.TimeoutExpired):
+                        error_msg = (
+                            "Cannot convert .mlg files - Node.js not found.\n\n"
+                            "Please install Node.js from https://nodejs.org/\n\n"
+                            "Then the app will automatically convert .mlg files.\n\n"
+                            "Alternatively, you can manually convert using:\n"
+                            "1. Install: npm install -g mlg-converter\n"
+                            "2. Convert: npx mlg-converter --format=csv yourfile.mlg\n"
+                            "3. Load the resulting CSV file"
+                        )
+                    self.file_label.config(text="No file loaded")
+                    messagebox.showerror("MLG Conversion Failed", error_msg)
                     return
             
             # Check if it's an MSL file (tab-separated or space-separated)
