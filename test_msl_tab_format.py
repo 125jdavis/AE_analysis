@@ -100,13 +100,26 @@ def test_space_separated_msl():
         with open(filename, 'r', encoding='utf-8', errors='ignore') as f:
             lines = f.readlines()
         
-        # Check if file has tabs
-        has_tabs = any('\t' in line for line in lines[:10])
+        # Check if file has tabs (excluding header lines)
+        has_tabs = False
+        for line in lines[:10]:
+            stripped = line.strip()
+            if stripped and not stripped.startswith(('"', '#')):
+                if '\t' in line:
+                    has_tabs = True
+                    break
         
         if has_tabs:
             print(f"  Detected tab-separated format")
             # Use new logic (same as test 1)
-            skip_count = sum(1 for line in lines if line.strip().startswith(('"', '#')))
+            # Count consecutive header lines from the beginning
+            skip_count = 0
+            for line in lines:
+                stripped = line.strip()
+                if stripped.startswith(('"', '#')):
+                    skip_count += 1
+                else:
+                    break
             data = pd.read_csv(filename, sep='\t', skiprows=skip_count, header=0,
                               engine='python', encoding='utf-8', encoding_errors='ignore')
             if len(data) > 0:

@@ -159,7 +159,14 @@ class AEAnalyzer:
                     lines = f.readlines()
                 
                 # Detect if file uses tabs (modern format) or spaces (older format)
-                has_tabs = any('\t' in line for line in lines[:10] if line.strip() and not line.strip().startswith(('"', '#')))
+                # Check non-header lines for tabs
+                has_tabs = False
+                for line in lines[:10]:
+                    stripped = line.strip()
+                    if stripped and not stripped.startswith(('"', '#')):
+                        if '\t' in line:
+                            has_tabs = True
+                            break
                 
                 if has_tabs:
                     # Tab-separated format (modern MegaSquirt)
