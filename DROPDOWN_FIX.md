@@ -3,15 +3,35 @@
 ## Problem
 The column selection dropdown was showing all channel names in a single line separated by commas instead of as separate selectable items.
 
-**Before (Broken):**
+**Root Cause Identified:**
+The issue was in the CSV parsing logic. When trying to auto-detect the separator, the code tried semicolon first:
+```python
+try:
+    self.data = pd.read_csv(filename, sep=';')
+except:
+    self.data = pd.read_csv(filename, sep=',')
 ```
-TPS: [Time,RPM,TPS,PW,AFR                    ▼]
-```
-❌ User could not select individual columns
-❌ All columns shown as one comma-separated string
+
+For comma-separated files like `sample_data.csv`, pandas doesn't raise an exception when using `sep=';'` - instead it reads the entire header line as a SINGLE column: `'Time,RPM,TPS,PW,AFR'`. This single column name then appeared in the dropdown as one comma-separated line.
 
 ## Solution
-Changed the column assignment to use `tuple()` with explicit string conversion when populating tkinter Combobox values.
+Fixed the CSV parsing logic to validate that the parse succeeded by checking the column count:
+
+```python
+try:
+    self.data = pd.read_csv(filename, sep=';')
+    # If semicolon parse resulted in only 1 column, it's likely comma-separated
+    if len(self.data.columns) == 1:
+        self.data = pd.read_csv(filename, sep=',')
+except:
+    self.data = pd.read_csv(filename, sep=',')
+```
+
+Now the code:
+1. Tries semicolon separator first
+2. Checks if it resulted in only 1 column (indicating wrong separator)
+3. If so, re-reads with comma separator
+4. Falls back to comma if semicolon raises an exception
 
 **After (Fixed):**
 ```
@@ -23,105 +43,62 @@ TPS: [TPS                                    ▼]
      └─ AFR
 ```
 ✅ Each column is a separate dropdown item
-✅ User can select any individual column
+✅ Works with both comma and semicolon separated CSVs
 
-## Code Change
+## Code Changes
 
-### Before (ae_analyzer.py, line 156)
+### ae_analyzer.py (lines 147-151)
 ```python
-columns = list(self.data.columns)
-self.time_combo['values'] = columns
-self.rpm_combo['values'] = columns
-self.tps_combo['values'] = columns
-self.pw_combo['values'] = columns
-self.afr_combo['values'] = columns
-```
+# Before (BUGGY)
+try:
+    self.data = pd.read_csv(filename, sep=';')
+except (pd.errors.ParserError, pd.errors.EmptyDataError):
+    self.data = pd.read_csv(filename, sep=',')
 
-### After (ae_analyzer.py, line 156-161)
-```python
-# Convert to tuple for proper tkinter Combobox display
-# Using tuple() ensures columns appear as separate dropdown items
-# rather than as a single comma-separated string
-columns = tuple(str(col) for col in self.data.columns)
-self.time_combo['values'] = columns
-self.rpm_combo['values'] = columns
-self.tps_combo['values'] = columns
-self.pw_combo['values'] = columns
-self.afr_combo['values'] = columns
+# After (FIXED)
+try:
+    self.data = pd.read_csv(filename, sep=';')
+    # If semicolon parse resulted in only 1 column, it's likely comma-separated
+    if len(self.data.columns) == 1:
+        self.data = pd.read_csv(filename, sep=',')
+except (pd.errors.ParserError, pd.errors.EmptyDataError):
+    self.data = pd.read_csv(filename, sep=',')
 ```
 
 ## Technical Details
 
-### Root Cause
-Tkinter's Combobox widget requires values to be properly formatted for display in the dropdown. When pandas DataFrame columns are passed directly or as a list without explicit conversion, some tkinter versions may not properly parse them into individual dropdown items, resulting in all column names appearing as a single comma-separated string.
-
-### The Fix
-The enhanced fix does three things:
-1. **Uses `tuple()`** - Ensures consistent behavior across tkinter versions
-2. **Explicit `str()` conversion** - Guarantees each column name is a proper string
-3. **Generator expression** - Cleanly converts each column to string format
-
-This approach is bulletproof and works regardless of:
-- pandas version or column Index type
-- tkinter version differences
-- Python version variations
-- Column names with special characters
+### Why the Test Worked But the App Didn't
+The `test_spyder_fix.py` test creates a DataFrame directly, bypassing the CSV reading logic. The actual application used the buggy CSV parser that mis-detected the separator, causing the single-column issue.
 
 ### Testing
-✅ All existing tests pass
-✅ Integration test confirms dropdowns work correctly
-✅ Each of the 5 columns (Time, RPM, TPS, PW, AFR) displays as a separate item
-✅ Tested with columns containing special characters
-✅ Works with both `state="readonly"` and writable comboboxes
+✅ CSV parsing test passes for both comma and semicolon separators
+✅ All existing tests pass (test_ae_analyzer.py)
+✅ Full integration test confirms dropdowns show 5 separate items
+✅ Tested with sample_data.csv (comma-separated)
+✅ Tested with semicolon-separated CSV files
 
 ### Impact
-- **Affected components:** All 5 column selection dropdowns (Time, RPM, TPS, Pulsewidth, AFR)
-- **Change type:** Single line change with added documentation (minimal, surgical fix)
-- **Risk:** Very low - tuple with explicit string conversion is the most robust approach
-- **Backward compatibility:** Maintained - no API changes
+- **Fixed:** CSV files now parse correctly regardless of separator
+- **Fixed:** Dropdown menus show individual columns as separate items
+- **Compatibility:** Works with both comma and semicolon separated files
+- **No breaking changes:** Existing functionality maintained
 
-## For Users Experiencing the Issue
+## For Users
 
-If you're still seeing the comma-separated list after pulling the latest code:
-
-1. **Verify you're on the correct branch:**
-   ```bash
-   git status  # Should show the PR branch
-   git pull origin copilot/fix-column-selection-dropdown
-   ```
-
-2. **Clear Python cache:**
-   ```bash
-   find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
-   find . -name "*.pyc" -delete
-   ```
-
-3. **Restart your Python environment:**
-   - Close and restart Spyder/IDE
-   - Re-run the script
-
-4. **Verify the fix is in place:**
-   ```bash
-   grep -A 3 "# Convert to tuple for proper tkinter" ae_analyzer.py
-   ```
-   You should see the enhanced tuple conversion code.
+After pulling this fix:
+1. **No code changes needed** - the fix is in ae_analyzer.py
+2. **Restart Spyder/IDE** to clear any cached modules
+3. Run ae_analyzer.py
+4. Load sample_data.csv (or any CSV file)
+5. Click on any dropdown - you should see separate items!
 
 ## Verification
 
-Run the test:
+Run the tests:
 ```bash
-python3 test_dropdown_fix.py
+python3 test_csv_parsing.py     # Tests CSV parsing logic
+python3 test_full_integration.py # Tests full application flow
+python3 test_ae_analyzer.py      # Tests core functionality
 ```
 
-Expected output:
-```
-✓ Loaded sample data with columns: ['Time', 'RPM', 'TPS', 'PW', 'AFR']
-✓ Created comboboxes with tuple values
-✓ PASS: Combobox has 5 separate items
-  Item 1: 'Time'
-  Item 2: 'RPM'
-  Item 3: 'TPS'
-  Item 4: 'PW'
-  Item 5: 'AFR'
-✓ SUCCESS: Dropdown will show separate items, not a single line
-```
+All tests should pass with output showing 5 columns correctly parsed.

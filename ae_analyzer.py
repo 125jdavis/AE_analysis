@@ -145,9 +145,14 @@ class AEAnalyzer:
                     return
             
             # Try reading with different separators
+            # First try semicolon, but verify it parsed correctly (multiple columns)
             try:
                 self.data = pd.read_csv(filename, sep=';')
+                # If semicolon parse resulted in only 1 column, it's likely comma-separated
+                if len(self.data.columns) == 1:
+                    self.data = pd.read_csv(filename, sep=',')
             except (pd.errors.ParserError, pd.errors.EmptyDataError):
+                # If semicolon fails, try comma
                 self.data = pd.read_csv(filename, sep=',')
             
             self.file_label.config(text=f"Loaded: {os.path.basename(filename)}")
