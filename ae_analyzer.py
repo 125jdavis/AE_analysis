@@ -48,7 +48,7 @@ class AEAnalyzer:
         top_frame.grid(row=0, column=0, sticky=(tk.W, tk.E))
         
         # File loading
-        ttk.Button(top_frame, text="Load CSV/MLG File", 
+        ttk.Button(top_frame, text="Load CSV/MLG/MSL File", 
                   command=self.load_file).grid(row=0, column=0, padx=5)
         self.file_label = ttk.Label(top_frame, text="No file loaded")
         self.file_label.grid(row=0, column=1, padx=5)
@@ -120,10 +120,10 @@ class AEAnalyzer:
         toolbar.update()
         
     def load_file(self):
-        """Load a CSV or MLG file"""
+        """Load a CSV, MLG, or MSL file"""
         filename = filedialog.askopenfilename(
             title="Select log file",
-            filetypes=[("CSV files", "*.csv"), ("MLG files", "*.mlg"), ("All files", "*.*")]
+            filetypes=[("CSV files", "*.csv"), ("MLG files", "*.mlg"), ("MSL files", "*.msl"), ("All files", "*.*")]
         )
         
         if not filename:
@@ -144,16 +144,21 @@ class AEAnalyzer:
                         "3. Load the resulting CSV file")
                     return
             
-            # Try reading with different separators
-            # First try semicolon, but verify it parsed correctly (multiple columns)
-            try:
-                self.data = pd.read_csv(filename, sep=';')
-                # If semicolon parse resulted in only 1 column, it's likely comma-separated
-                if len(self.data.columns) == 1:
+            # Check if it's an MSL file (space-separated with # comments)
+            if filename.lower().endswith('.msl'):
+                # MSL files are space-separated with comment lines starting with #
+                self.data = pd.read_csv(filename, sep=r'\s+', comment='#', engine='python')
+            else:
+                # Try reading with different separators
+                # First try semicolon, but verify it parsed correctly (multiple columns)
+                try:
+                    self.data = pd.read_csv(filename, sep=';')
+                    # If semicolon parse resulted in only 1 column, it's likely comma-separated
+                    if len(self.data.columns) == 1:
+                        self.data = pd.read_csv(filename, sep=',')
+                except (pd.errors.ParserError, pd.errors.EmptyDataError):
+                    # If semicolon fails, try comma
                     self.data = pd.read_csv(filename, sep=',')
-            except (pd.errors.ParserError, pd.errors.EmptyDataError):
-                # If semicolon fails, try comma
-                self.data = pd.read_csv(filename, sep=',')
             
             self.file_label.config(text=f"Loaded: {os.path.basename(filename)}")
             
