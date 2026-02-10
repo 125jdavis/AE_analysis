@@ -253,22 +253,24 @@ class AEAnalyzer:
         """Convert MLG file to CSV using mlg-converter if available"""
         try:
             import subprocess
-            output_file = mlg_file.rsplit('.', 1)[0] + '.csv'
+            
+            # Get absolute path for the mlg file
+            mlg_file_abs = os.path.abspath(mlg_file)
+            output_file = mlg_file_abs.rsplit('.', 1)[0] + '.csv'
             
             # Check if CSV already exists (from previous conversion)
             if os.path.exists(output_file):
-                # Verify it's not empty and was recently created
+                # Verify it's not empty
                 if os.path.getsize(output_file) > 0:
                     return output_file
             
             # Try to convert using mlg-converter
             # Increase timeout to 60 seconds for first-time package download
             result = subprocess.run(
-                ['npx', 'mlg-converter', '--format=csv', mlg_file],
+                ['npx', 'mlg-converter', '--format=csv', mlg_file_abs],
                 capture_output=True,
                 text=True,
-                timeout=60,
-                cwd=os.path.dirname(os.path.abspath(mlg_file)) or '.'
+                timeout=60
             )
             
             if result.returncode == 0 and os.path.exists(output_file):
@@ -276,11 +278,13 @@ class AEAnalyzer:
             
         except subprocess.TimeoutExpired:
             # Timeout - check if file was still created
-            output_file = mlg_file.rsplit('.', 1)[0] + '.csv'
+            mlg_file_abs = os.path.abspath(mlg_file)
+            output_file = mlg_file_abs.rsplit('.', 1)[0] + '.csv'
             if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
                 return output_file
-        except (FileNotFoundError, subprocess.CalledProcessError, OSError):
-            pass
+        except (FileNotFoundError, subprocess.CalledProcessError, OSError) as e:
+            # Log the error for debugging but don't crash
+            print(f"MLG conversion error: {e}")
         
         return None
     
