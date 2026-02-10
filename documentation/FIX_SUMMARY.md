@@ -66,7 +66,7 @@ Just load your .msl files through the GUI - it should now work!
 I created a diagnostic script you can run:
 
 ```bash
-python test_user_msl.py your_file.msl
+python Tests/test_user_msl.py your_file.msl
 ```
 
 This will show:
@@ -89,7 +89,7 @@ The URLs you provided (tunes.fome.tech) are not accessible from this environment
 
 If loading your specific files still fails:
 
-1. Run the test script: `python test_user_msl.py your_file.msl`
+1. Run the test script: `python Tests/test_user_msl.py your_file.msl`
 2. Share the output (or just the first 10-20 lines of your .msl file)
 3. I can adjust the parser for any format variations
 
@@ -112,8 +112,8 @@ If you want me to test with your actual files, please share them via:
 - Added numeric type conversion
 
 ### New Files Created:
-- `test_msl_tab_format.py` - Comprehensive .msl format tests
-- `test_user_msl.py` - Diagnostic script for user files
+- `Tests/test_msl_tab_format.py` - Comprehensive .msl format tests
+- `Tests/test_user_msl.py` - Diagnostic script for user files
 - `MSL_FIX_STATUS.md` - This documentation
 - `sample_data_realistic.msl` - Realistic test file with proper format
 
@@ -121,6 +121,6 @@ If you want me to test with your actual files, please share them via:
 
 1. **Try loading your .msl files** in the app
 2. **If successful**: You're done! ✓
-3. **If not**: Run `test_user_msl.py your_file.msl` and share the output
+3. **If not**: Run `Tests/test_user_msl.py your_file.msl` and share the output
 
 The fix is complete and ready to use!

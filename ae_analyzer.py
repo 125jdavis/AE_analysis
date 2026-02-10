@@ -123,7 +123,13 @@ class AEAnalyzer:
         """Load a CSV, MLG, or MSL file"""
         filename = filedialog.askopenfilename(
             title="Select log file",
-            filetypes=[("CSV files", "*.csv"), ("MLG files", "*.mlg"), ("MSL files", "*.msl"), ("All files", "*.*")]
+            filetypes=[
+                ("All supported files", "*.csv *.msl *.mlg"),
+                ("CSV files", "*.csv"),
+                ("MSL files", "*.msl"),
+                ("MLG files", "*.mlg"),
+                ("All files", "*.*")
+            ]
         )
         
         if not filename:

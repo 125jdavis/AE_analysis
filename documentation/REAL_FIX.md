@@ -73,7 +73,7 @@ except (pd.errors.ParserError, pd.errors.EmptyDataError):
 
 ## Why the Test Worked But the App Didn't
 
-Your test (`test_spyder_fix.py`) created a DataFrame directly:
+Your test (`Tests/test_spyder_fix.py`) created a DataFrame directly:
 ```python
 test_data = pd.DataFrame({'Time': [...], 'RPM': [...]})
 ```

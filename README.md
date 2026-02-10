@@ -6,7 +6,7 @@ Tool for analyzing acceleration enrichment (AE) events in MegaSquirt log files.
 
 ## Features
 
-- Load MegaLog (.mlg) or CSV files
+- Load MegaSquirt log files (.msl, .mlg) or CSV files
 - Automatically detect acceleration enrichment events based on TPS rate of change
 - Select specific data columns (RPM, TPS, Pulsewidth, AFR)
 - Configurable detection thresholds
@@ -41,10 +41,11 @@ python ae_analyzer.py
 
 ### Loading Files
 
-1. Click "Load CSV/MLG File" button
-2. Select your log file:
-   - **CSV files**: Supported directly
-   - **MLG files**: Will attempt automatic conversion if mlg-converter is installed
+1. Click "Load CSV/MLG/MSL File" button
+2. Select your log file (all supported formats shown by default):
+   - **CSV files**: Supported directly (comma or semicolon separated)
+   - **MSL files**: MegaSquirt ASCII log format (tab-separated)
+   - **MLG files**: Binary format - will attempt automatic conversion if mlg-converter is installed
    - If automatic conversion fails, manually convert: `npx mlg-converter --format=csv yourfile.mlg`
 
 ### Analyzing Data
@@ -107,10 +108,32 @@ Time,RPM,TPS,PW,AFR
 ...
 ```
 
+### MSL Format
+MSL (MegaSquirt Log) files are tab-separated ASCII log files from MegaSquirt ECUs. They typically contain:
+- Quoted metadata headers
+- Column names
+- Units row
+- Data rows
+
+The tool automatically handles the format detection and parsing.
+
 ### MLG Format
 MLG (MegaLog) files are binary log files from MegaSquirt ECUs. The tool can:
 - Automatically convert them using mlg-converter (if installed)
 - Guide you to manually convert them to CSV format
+
+## Testing
+
+Tests are located in the `Tests/` folder. Run tests with:
+```bash
+python Tests/test_ae_analyzer.py        # Core functionality
+python Tests/test_msl_tab_format.py     # MSL file parsing
+python Tests/test_multiformat_loading.py # Multi-format support
+```
+
+## Documentation
+
+Additional documentation is available in the `documentation/` folder.
 
 ## Contributing
 

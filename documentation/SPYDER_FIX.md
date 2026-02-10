@@ -38,7 +38,7 @@ self.afr_combo['values'] = columns
 5. Click on any dropdown - you should now see separate items!
 
 ## Test the Fix
-Run `test_spyder_fix.py` in this directory to verify the fix works in your Spyder environment.
+Run `Tests/test_spyder_fix.py` in this directory to verify the fix works in your Spyder environment.
 
 ## Why This Works
 The explicit `str(col)` conversion ensures each pandas column name is properly converted to a Python string before being passed to tkinter's Combobox. Without this, some tkinter/pandas version combinations may not handle the conversion correctly, especially in IDE environments like Spyder.

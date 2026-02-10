@@ -68,7 +68,7 @@ except (pd.errors.ParserError, pd.errors.EmptyDataError):
 ## Technical Details
 
 ### Why the Test Worked But the App Didn't
-The `test_spyder_fix.py` test creates a DataFrame directly, bypassing the CSV reading logic. The actual application used the buggy CSV parser that mis-detected the separator, causing the single-column issue.
+The `Tests/test_spyder_fix.py` test creates a DataFrame directly, bypassing the CSV reading logic. The actual application used the buggy CSV parser that mis-detected the separator, causing the single-column issue.
 
 ### Testing
 ✅ CSV parsing test passes for both comma and semicolon separators
@@ -96,9 +96,9 @@ After pulling this fix:
 
 Run the tests:
 ```bash
-python3 test_csv_parsing.py     # Tests CSV parsing logic
-python3 test_full_integration.py # Tests full application flow
-python3 test_ae_analyzer.py      # Tests core functionality
+python3 Tests/test_csv_parsing.py     # Tests CSV parsing logic
+python3 Tests/test_full_integration.py # Tests full application flow
+python3 Tests/test_ae_analyzer.py      # Tests core functionality
 ```
 
 All tests should pass with output showing 5 columns correctly parsed.
