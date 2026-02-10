@@ -212,6 +212,18 @@ class AEAnalyzer:
                 except (pd.errors.ParserError, pd.errors.EmptyDataError):
                     # If semicolon fails, try comma
                     self.data = pd.read_csv(filename, sep=',')
+                
+                # Check if first row is units row (from MLG conversion or other sources)
+                # Units rows contain letters/symbols like "s", "RPM", "%", "ms", etc.
+                if len(self.data) > 0:
+                    first_row_str = self.data.iloc[0].astype(str)
+                    has_letters = first_row_str.str.contains('[a-zA-Z°%]', regex=True, na=False).any()
+                    if has_letters:
+                        # Skip the units row
+                        self.data = self.data.iloc[1:].reset_index(drop=True)
+                        # Convert columns to numeric where possible
+                        for col in self.data.columns:
+                            self.data[col] = pd.to_numeric(self.data[col], errors='coerce')
             
             self.file_label.config(text=f"Loaded: {os.path.basename(filename)}")
             
