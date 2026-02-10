@@ -251,40 +251,54 @@ class AEAnalyzer:
     
     def convert_mlg_to_csv(self, mlg_file):
         """Convert MLG file to CSV using mlg-converter if available"""
+        import subprocess
+        
+        # Get absolute path for the mlg file
+        mlg_file_abs = os.path.abspath(mlg_file)
+        output_file = mlg_file_abs.rsplit('.', 1)[0] + '.csv'
+        
+        # Check if CSV already exists (from previous conversion)
+        if os.path.exists(output_file):
+            # Verify it's not empty
+            if os.path.getsize(output_file) > 0:
+                print(f"Using existing CSV: {output_file}")
+                return output_file
+        
+        # Try to convert using mlg-converter
+        print(f"Converting MLG to CSV: {mlg_file_abs}")
         try:
-            import subprocess
-            
-            # Get absolute path for the mlg file
-            mlg_file_abs = os.path.abspath(mlg_file)
-            output_file = mlg_file_abs.rsplit('.', 1)[0] + '.csv'
-            
-            # Check if CSV already exists (from previous conversion)
-            if os.path.exists(output_file):
-                # Verify it's not empty
-                if os.path.getsize(output_file) > 0:
-                    return output_file
-            
-            # Try to convert using mlg-converter
-            # Increase timeout to 60 seconds for first-time package download
             result = subprocess.run(
                 ['npx', 'mlg-converter', '--format=csv', mlg_file_abs],
                 capture_output=True,
                 text=True,
-                timeout=60
+                timeout=90  # Increased timeout for first-time package download
             )
             
-            if result.returncode == 0 and os.path.exists(output_file):
-                return output_file
+            print(f"Conversion result: returncode={result.returncode}")
+            if result.stdout:
+                print(f"Stdout: {result.stdout.strip()}")
+            if result.stderr:
+                print(f"Stderr: {result.stderr.strip()}")
             
+            if result.returncode == 0:
+                if os.path.exists(output_file):
+                    print(f"✓ Conversion successful: {output_file}")
+                    return output_file
+                else:
+                    print(f"✗ Conversion returned success but CSV not found at: {output_file}")
+            else:
+                print(f"✗ Conversion failed with return code: {result.returncode}")
+                
         except subprocess.TimeoutExpired:
+            print(f"✗ Conversion timeout after 90 seconds")
             # Timeout - check if file was still created
-            mlg_file_abs = os.path.abspath(mlg_file)
-            output_file = mlg_file_abs.rsplit('.', 1)[0] + '.csv'
             if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
+                print(f"✓ File created despite timeout: {output_file}")
                 return output_file
-        except (FileNotFoundError, subprocess.CalledProcessError, OSError) as e:
-            # Log the error for debugging but don't crash
-            print(f"MLG conversion error: {e}")
+        except FileNotFoundError:
+            print(f"✗ npx or mlg-converter not found. Please install Node.js and mlg-converter.")
+        except (subprocess.CalledProcessError, OSError) as e:
+            print(f"✗ MLG conversion error: {e}")
         
         return None
     
