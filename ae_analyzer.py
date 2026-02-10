@@ -144,10 +144,50 @@ class AEAnalyzer:
                         "3. Load the resulting CSV file")
                     return
             
-            # Check if it's an MSL file (space-separated with # comments)
+            # Check if it's an MSL file (tab-separated or space-separated)
             if filename.lower().endswith('.msl'):
-                # MSL files are space-separated with comment lines starting with #
-                self.data = pd.read_csv(filename, sep=r'\s+', comment='#', engine='python')
+                # MSL files can be tab-separated (modern MegaSquirt format) or space-separated (older style)
+                # Modern format has quoted metadata headers, column names, units row, then data:
+                # "MS3 Format 0568.11E..."
+                # "Capture Date: ..."
+                # Time	RPM	TPS...  (column names)
+                # s	RPM	%...      (units row)
+                # 0.00	1000	10.0... (data)
+                
+                # Read file to detect format and count header lines
+                with open(filename, 'r', encoding='utf-8', errors='ignore') as f:
+                    lines = f.readlines()
+                
+                # Detect if file uses tabs (modern format) or spaces (older format)
+                has_tabs = any('\t' in line for line in lines[:10] if line.strip() and not line.strip().startswith(('"', '#')))
+                
+                if has_tabs:
+                    # Tab-separated format (modern MegaSquirt)
+                    # Count lines starting with quotes or # (metadata headers)
+                    skip_count = 0
+                    for line in lines:
+                        stripped = line.strip()
+                        if stripped.startswith('"') or stripped.startswith('#'):
+                            skip_count += 1
+                        else:
+                            break
+                    
+                    # Read with column names as header
+                    self.data = pd.read_csv(filename, sep='\t', skiprows=skip_count, header=0,
+                                           engine='python', encoding='utf-8', encoding_errors='ignore')
+                    
+                    # Check if first row is units row (contains letters/symbols) and skip it
+                    if len(self.data) > 0:
+                        first_row_str = self.data.iloc[0].astype(str)
+                        has_letters = first_row_str.str.contains('[a-zA-Z°%]', regex=True, na=False).any()
+                        if has_letters:
+                            self.data = self.data.iloc[1:].reset_index(drop=True)
+                            # Convert columns to numeric where possible
+                            for col in self.data.columns:
+                                self.data[col] = pd.to_numeric(self.data[col], errors='coerce')
+                else:
+                    # Space-separated format (older style, backward compatibility)
+                    self.data = pd.read_csv(filename, sep=r'\s+', comment='#', engine='python')
             else:
                 # Try reading with different separators
                 # First try semicolon, but verify it parsed correctly (multiple columns)
