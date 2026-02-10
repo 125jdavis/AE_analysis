@@ -242,17 +242,34 @@ class AEAnalyzer:
         try:
             import subprocess
             output_file = mlg_file.rsplit('.', 1)[0] + '.csv'
+            
+            # Check if CSV already exists (from previous conversion)
+            if os.path.exists(output_file):
+                # Verify it's not empty and was recently created
+                if os.path.getsize(output_file) > 0:
+                    return output_file
+            
+            # Try to convert using mlg-converter
+            # Increase timeout to 60 seconds for first-time package download
             result = subprocess.run(
                 ['npx', 'mlg-converter', '--format=csv', mlg_file],
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=60,
+                cwd=os.path.dirname(os.path.abspath(mlg_file)) or '.'
             )
+            
             if result.returncode == 0 and os.path.exists(output_file):
                 return output_file
-        except (subprocess.TimeoutExpired, FileNotFoundError, 
-                subprocess.CalledProcessError, OSError):
+            
+        except subprocess.TimeoutExpired:
+            # Timeout - check if file was still created
+            output_file = mlg_file.rsplit('.', 1)[0] + '.csv'
+            if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
+                return output_file
+        except (FileNotFoundError, subprocess.CalledProcessError, OSError):
             pass
+        
         return None
     
     def auto_select_columns(self, columns):
