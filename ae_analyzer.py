@@ -336,10 +336,15 @@ class AEAnalyzer:
             if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
                 print(f"✓ File created despite timeout: {output_file}")
                 return output_file
-        except FileNotFoundError:
-            print(f"✗ npx or mlg-converter not found. Please install Node.js and mlg-converter.")
+        except FileNotFoundError as e:
+            print(f"✗ npx or mlg-converter not found: {e}")
         except (subprocess.CalledProcessError, OSError) as e:
             print(f"✗ MLG conversion error: {e}")
+        except Exception as e:
+            # Catch any other unexpected errors
+            print(f"✗ Unexpected error during MLG conversion: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
         
         return None
     
