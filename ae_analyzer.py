@@ -147,10 +147,29 @@ class AEAnalyzer:
                 if csv_filename:
                     filename = csv_filename
                 else:
-                    # Check if npx is available
+                    # Check if npx is available to determine appropriate error message
                     import subprocess
+                    npx_available = False
                     try:
-                        subprocess.run(['npx', '--version'], capture_output=True, timeout=5)
+                        result = subprocess.run(['npx', '--version'], 
+                                              capture_output=True, 
+                                              timeout=5,
+                                              text=True)
+                        # Check if npx actually succeeded (returncode 0)
+                        if result.returncode == 0:
+                            npx_available = True
+                            print(f"npx is available: {result.stdout.strip()}")
+                        else:
+                            print(f"npx returned non-zero exit code: {result.returncode}")
+                    except FileNotFoundError:
+                        print(f"npx command not found - Node.js not installed")
+                    except subprocess.TimeoutExpired:
+                        print(f"npx --version timed out")
+                    except Exception as e:
+                        print(f"Error checking npx availability: {e}")
+                    
+                    # Show appropriate error message based on npx availability
+                    if npx_available:
                         error_msg = (
                             "Failed to convert .mlg file to CSV.\n\n"
                             "The mlg-converter tool encountered an error. "
@@ -158,7 +177,7 @@ class AEAnalyzer:
                             "You can manually convert using:\n"
                             "npx mlg-converter --format=csv yourfile.mlg"
                         )
-                    except (FileNotFoundError, subprocess.TimeoutExpired):
+                    else:
                         error_msg = (
                             "Cannot convert .mlg files - Node.js not found.\n\n"
                             "Please install Node.js from https://nodejs.org/\n\n"
