@@ -48,7 +48,7 @@ class AEAnalyzer:
         top_frame.grid(row=0, column=0, sticky=(tk.W, tk.E))
         
         # File loading
-        ttk.Button(top_frame, text="Load CSV/MLG File", 
+        ttk.Button(top_frame, text="Load CSV/MLG/MSL File", 
                   command=self.load_file).grid(row=0, column=0, padx=5)
         self.file_label = ttk.Label(top_frame, text="No file loaded")
         self.file_label.grid(row=0, column=1, padx=5)
@@ -120,10 +120,16 @@ class AEAnalyzer:
         toolbar.update()
         
     def load_file(self):
-        """Load a CSV or MLG file"""
+        """Load a CSV, MLG, or MSL file"""
         filename = filedialog.askopenfilename(
             title="Select log file",
-            filetypes=[("CSV files", "*.csv"), ("MLG files", "*.mlg"), ("All files", "*.*")]
+            filetypes=[
+                ("All supported files", "*.csv *.msl *.mlg"),
+                ("CSV files", "*.csv"),
+                ("MSL files", "*.msl"),
+                ("MLG files", "*.mlg"),
+                ("All files", "*.*")
+            ]
         )
         
         if not filename:
@@ -132,28 +138,133 @@ class AEAnalyzer:
         try:
             # Check if it's an MLG file
             if filename.lower().endswith('.mlg'):
+                # Show status message
+                self.file_label.config(text="Converting MLG file...")
+                self.root.update()
+                
                 # Try to convert MLG to CSV using mlg-converter if available
                 csv_filename = self.convert_mlg_to_csv(filename)
                 if csv_filename:
                     filename = csv_filename
                 else:
-                    messagebox.showerror("Error", 
-                        "Cannot read .mlg files directly. Please:\n"
-                        "1. Install Node.js and mlg-converter: npm install -g mlg-converter\n"
-                        "2. Convert to CSV: npx mlg-converter --format=csv yourfile.mlg\n"
-                        "3. Load the resulting CSV file")
+                    # Check if npx is available to determine appropriate error message
+                    import subprocess
+                    npx_available = False
+                    try:
+                        result = subprocess.run(['npx', '--version'], 
+                                              capture_output=True, 
+                                              timeout=5,
+                                              text=True)
+                        # Check if npx actually succeeded (returncode 0)
+                        if result.returncode == 0:
+                            npx_available = True
+                            print(f"npx is available: {result.stdout.strip()}")
+                        else:
+                            print(f"npx returned non-zero exit code: {result.returncode}")
+                    except FileNotFoundError:
+                        print(f"npx command not found - Node.js not installed")
+                    except subprocess.TimeoutExpired:
+                        print(f"npx --version timed out")
+                    except Exception as e:
+                        print(f"Error checking npx availability: {e}")
+                    
+                    # Show appropriate error message based on npx availability
+                    if npx_available:
+                        error_msg = (
+                            "Failed to convert .mlg file to CSV.\n\n"
+                            "The mlg-converter tool encountered an error. "
+                            "Check the console output for details.\n\n"
+                            "You can manually convert using:\n"
+                            "npx mlg-converter --format=csv yourfile.mlg"
+                        )
+                    else:
+                        error_msg = (
+                            "Cannot convert .mlg files - Node.js not found.\n\n"
+                            "Please install Node.js from https://nodejs.org/\n\n"
+                            "Then the app will automatically convert .mlg files.\n\n"
+                            "Alternatively, you can manually convert using:\n"
+                            "1. Install: npm install -g mlg-converter\n"
+                            "2. Convert: npx mlg-converter --format=csv yourfile.mlg\n"
+                            "3. Load the resulting CSV file"
+                        )
+                    self.file_label.config(text="No file loaded")
+                    messagebox.showerror("MLG Conversion Failed", error_msg)
                     return
             
-            # Try reading with different separators
-            # First try semicolon, but verify it parsed correctly (multiple columns)
-            try:
-                self.data = pd.read_csv(filename, sep=';')
-                # If semicolon parse resulted in only 1 column, it's likely comma-separated
-                if len(self.data.columns) == 1:
+            # Check if it's an MSL file (tab-separated or space-separated)
+            if filename.lower().endswith('.msl'):
+                # MSL files can be tab-separated (modern MegaSquirt format) or space-separated (older style)
+                # Modern format has quoted metadata headers, column names, units row, then data:
+                # "MS3 Format 0568.11E..."
+                # "Capture Date: ..."
+                # Time	RPM	TPS...  (column names)
+                # s	RPM	%...      (units row)
+                # 0.00	1000	10.0... (data)
+                
+                # Read file to detect format and count header lines
+                with open(filename, 'r', encoding='utf-8', errors='ignore') as f:
+                    lines = f.readlines()
+                
+                # Detect if file uses tabs (modern format) or spaces (older format)
+                # Check non-header lines for tabs
+                has_tabs = False
+                for line in lines[:10]:
+                    stripped = line.strip()
+                    if stripped and not stripped.startswith(('"', '#')):
+                        if '\t' in line:
+                            has_tabs = True
+                            break
+                
+                if has_tabs:
+                    # Tab-separated format (modern MegaSquirt)
+                    # Count lines starting with quotes or # (metadata headers)
+                    skip_count = 0
+                    for line in lines:
+                        stripped = line.strip()
+                        if stripped.startswith('"') or stripped.startswith('#'):
+                            skip_count += 1
+                        else:
+                            break
+                    
+                    # Read with column names as header
+                    self.data = pd.read_csv(filename, sep='\t', skiprows=skip_count, header=0,
+                                           engine='python', encoding='utf-8', encoding_errors='ignore')
+                    
+                    # Check if first row is units row (contains letters/symbols) and skip it
+                    if len(self.data) > 0:
+                        first_row_str = self.data.iloc[0].astype(str)
+                        has_letters = first_row_str.str.contains('[a-zA-Z°%]', regex=True, na=False).any()
+                        if has_letters:
+                            self.data = self.data.iloc[1:].reset_index(drop=True)
+                            # Convert columns to numeric where possible
+                            for col in self.data.columns:
+                                self.data[col] = pd.to_numeric(self.data[col], errors='coerce')
+                else:
+                    # Space-separated format (older style, backward compatibility)
+                    self.data = pd.read_csv(filename, sep=r'\s+', comment='#', engine='python')
+            else:
+                # Try reading with different separators
+                # First try semicolon, but verify it parsed correctly (multiple columns)
+                try:
+                    self.data = pd.read_csv(filename, sep=';')
+                    # If semicolon parse resulted in only 1 column, it's likely comma-separated
+                    if len(self.data.columns) == 1:
+                        self.data = pd.read_csv(filename, sep=',')
+                except (pd.errors.ParserError, pd.errors.EmptyDataError):
+                    # If semicolon fails, try comma
                     self.data = pd.read_csv(filename, sep=',')
-            except (pd.errors.ParserError, pd.errors.EmptyDataError):
-                # If semicolon fails, try comma
-                self.data = pd.read_csv(filename, sep=',')
+                
+                # Check if first row is units row (from MLG conversion or other sources)
+                # Units rows contain letters/symbols like "s", "RPM", "%", "ms", etc.
+                if len(self.data) > 0:
+                    first_row_str = self.data.iloc[0].astype(str)
+                    has_letters = first_row_str.str.contains('[a-zA-Z°%]', regex=True, na=False).any()
+                    if has_letters:
+                        # Skip the units row
+                        self.data = self.data.iloc[1:].reset_index(drop=True)
+                        # Convert columns to numeric where possible
+                        for col in self.data.columns:
+                            self.data[col] = pd.to_numeric(self.data[col], errors='coerce')
             
             self.file_label.config(text=f"Loaded: {os.path.basename(filename)}")
             
@@ -181,20 +292,60 @@ class AEAnalyzer:
     
     def convert_mlg_to_csv(self, mlg_file):
         """Convert MLG file to CSV using mlg-converter if available"""
+        import subprocess
+        
+        # Get absolute path for the mlg file
+        mlg_file_abs = os.path.abspath(mlg_file)
+        output_file = mlg_file_abs.rsplit('.', 1)[0] + '.csv'
+        
+        # Check if CSV already exists (from previous conversion)
+        if os.path.exists(output_file):
+            # Verify it's not empty
+            if os.path.getsize(output_file) > 0:
+                print(f"Using existing CSV: {output_file}")
+                return output_file
+        
+        # Try to convert using mlg-converter
+        print(f"Converting MLG to CSV: {mlg_file_abs}")
         try:
-            import subprocess
-            output_file = mlg_file.rsplit('.', 1)[0] + '.csv'
             result = subprocess.run(
-                ['npx', 'mlg-converter', '--format=csv', mlg_file],
+                ['npx', 'mlg-converter', '--format=csv', mlg_file_abs],
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=90  # Increased timeout for first-time package download
             )
-            if result.returncode == 0 and os.path.exists(output_file):
+            
+            print(f"Conversion result: returncode={result.returncode}")
+            if result.stdout:
+                print(f"Stdout: {result.stdout.strip()}")
+            if result.stderr:
+                print(f"Stderr: {result.stderr.strip()}")
+            
+            if result.returncode == 0:
+                if os.path.exists(output_file):
+                    print(f"✓ Conversion successful: {output_file}")
+                    return output_file
+                else:
+                    print(f"✗ Conversion returned success but CSV not found at: {output_file}")
+            else:
+                print(f"✗ Conversion failed with return code: {result.returncode}")
+                
+        except subprocess.TimeoutExpired:
+            print(f"✗ Conversion timeout after 90 seconds")
+            # Timeout - check if file was still created
+            if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
+                print(f"✓ File created despite timeout: {output_file}")
                 return output_file
-        except (subprocess.TimeoutExpired, FileNotFoundError, 
-                subprocess.CalledProcessError, OSError):
-            pass
+        except FileNotFoundError as e:
+            print(f"✗ npx or mlg-converter not found: {e}")
+        except (subprocess.CalledProcessError, OSError) as e:
+            print(f"✗ MLG conversion error: {e}")
+        except Exception as e:
+            # Catch any other unexpected errors
+            print(f"✗ Unexpected error during MLG conversion: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+        
         return None
     
     def auto_select_columns(self, columns):
